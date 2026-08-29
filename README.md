@@ -1,3 +1,5 @@
+<img width="94" height="20" alt="dc070fc6-57ec-4466-aaa2-ca315d7d5a1f" src="https://github.com/user-attachments/assets/3b4f7b48-1082-4ddd-b5be-9eee2faa701d" />
+
 # 🎯 选人器（astrbot_plugin_truth_dare）
 
 > QQ 群随机选人插件：报名 → 3D 滚轮动画选人 → 艾特点名。支持「一人 / 两人 / 纯文本」三种模式、深浅双主题、多群隔离、历史统计。
