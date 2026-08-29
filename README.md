@@ -1,4 +1,5 @@
-<img width="94" height="20" alt="dc070fc6-57ec-4466-aaa2-ca315d7d5a1f" src="https://github.com/user-attachments/assets/3b4f7b48-1082-4ddd-b5be-9eee2faa701d" />
+<img width="94" height="20" alt="dc070fc6-57ec-4466-aaa2-ca315d7d5a1f" src="https://github.com/user-attachments/assets/c7c638a4-d2ba-46d0-9e8d-0737076e7b8f" /><img width="92" height="20" alt="ec448bcb-a700-4dc1-81d7-ca3486a6ed6e" src="https://github.com/user-attachments/assets/2446c4d0-e70c-4999-a90d-b70ca4935a0a" />
+
 
 # 🎯 选人器（astrbot_plugin_truth_dare）
 
