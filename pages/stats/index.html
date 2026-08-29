@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>选人器 · 数据统计</title>
+<script src="/api/plugin/page/bridge-sdk.js"></script>
+<style>
+:root {
+  --bg: linear-gradient(135deg,#E9EFF6 0%,#D6E4F0 100%);
+  --cb: rgba(255,255,255,0.55);
+  --cb2: rgba(255,255,255,0.6);
+  --cs: 0 8px 32px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.7);
+  --c: #1F2937; --c2: #6B7280; --c3: #9CA3AF;
+  --l: rgba(229,231,235,0.6);
+  --p: #3B82F6; --g: #22C55E; --r: #EF4444;
+  --gold: #B45309; --goldbg: rgba(251,191,36,0.15);
+  --modal-bg: #FFFFFF;
+}
+html[data-theme=dark] {
+  --bg: linear-gradient(135deg,#2a2d3e 0%,#253247 100%);
+  --cb: rgba(255,255,255,0.08); --cb2: rgba(255,255,255,0.1);
+  --cs: 0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1);
+  --c: #E5E7EB; --c2: #9CA3AF; --c3: #6B7280;
+  --l: rgba(255,255,255,0.06);
+  --p: #60A5FA; --g: #4ADE80; --r: #F87171;
+  --gold: #FBBF24; --goldbg: rgba(251,191,36,0.1);
+  --modal-bg: #2a2d3e;
+}
+* { margin:0; padding:0; box-sizing:border-box }
+button { transition:transform .1s, background .15s, border-color .15s, color .15s, opacity .15s; }
+button:active { transform:scale(0.93); }
+body { font-family:'Microsoft YaHei','Segoe UI',sans-serif; background:var(--bg); color:var(--c);
+  min-height:100vh; transition:background .3s,color .3s; display:flex; flex-direction:column; }
+.hd { text-align:center; padding:20px 40px 2px; flex-shrink:0; position:relative }
+.hd h1 { font-size:24px; font-weight:800; letter-spacing:-0.02em;
+  background:linear-gradient(135deg,#1E3A5F 0%,#3B82F6 50%,#8B5CF6 100%);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+html[data-theme=dark] .hd h1 { background:linear-gradient(135deg,#60A5FA 0%,#A78BFA 100%);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+.hd .sub { color:var(--c3); font-size:12px; margin-top:4px }
+.hd .refresh { position:absolute; right:24px; top:22px; font-size:12px; padding:6px 14px;
+  border-radius:8px; border:1px solid var(--l); background:var(--cb2); color:var(--c2); cursor:pointer; }
+.hd .refresh:hover { color:var(--p); border-color:var(--p); background:var(--cb) }
+.wrap { display:flex; gap:14px; padding:14px 28px 28px; flex:1; min-height:0 }
+.panel { background:var(--cb); border-radius:var(--r-card,14px); box-shadow:var(--cs);
+  backdrop-filter:blur(10px); border:1px solid var(--l); }
+.groups { width:300px; flex-shrink:0; overflow-y:auto; padding:10px }
+.home-btn { display:block; width:100%; margin-bottom:8px; font-size:13px; padding:8px 0;
+  border-radius:10px; border:1px solid var(--l); background:var(--cb2); color:var(--c2); cursor:pointer; }
+.home-btn:hover { color:var(--p); border-color:var(--p); }
+.home-btn.on { background:var(--p); color:#fff; border-color:var(--p); }
+.chip { font-size:10px; padding:2px 7px; border-radius:999px; background:var(--goldbg);
+  color:var(--gold); white-space:nowrap; max-width:120px; overflow:hidden; text-overflow:ellipsis; }
+.grp-head { display:flex; align-items:center; justify-content:space-between; padding:6px 10px }
+.grp-head h2 { font-size:14px; color:var(--c2); font-weight:600 }
+.grp-head .add { font-size:12px; padding:4px 12px; border-radius:7px; border:1px solid var(--p);
+  background:rgba(59,130,246,0.12); color:var(--p); cursor:pointer }
+.grp-head .add:hover { background:rgba(59,130,246,0.2) }
+.gitem { padding:10px 12px; border-radius:10px; cursor:pointer; margin-bottom:6px;
+  transition:background .15s; border:1px solid transparent; position:relative }
+.gitem:hover { background:var(--cb2) }
+.gitem.on { background:var(--cb2); border-color:var(--p) }
+.gitem .nm { font-size:14px; font-weight:700; overflow:hidden; text-overflow:ellipsis;
+  white-space:nowrap; padding-right:58px }
+.gitem .nm .orig { font-weight:400; color:var(--c3); font-size:12px }
+.gitem .gid { font-size:11px; color:var(--c3); margin-top:2px }
+.gitem .sub2 { font-size:11px; color:var(--c2); margin-top:4px }
+.gitem .ops { position:absolute; top:8px; right:8px; display:flex; gap:4px }
+.gitem .ops button { font-size:11px; padding:3px 8px; border-radius:6px; cursor:pointer;
+  border:1px solid var(--l); background:var(--cb2); color:var(--c2) }
+.gitem .ops button:hover { border-color:var(--r); color:var(--r); background:rgba(239,68,68,0.08) }
+.detail { flex:1; overflow-y:auto; padding:16px 22px }
+.detail .dt { display:flex; align-items:center; gap:10px; flex-wrap:wrap }
+.detail .dn { font-size:20px; font-weight:800 }
+.detail .dgid { font-size:12px; color:var(--c3) }
+.detail .edit { font-size:12px; color:var(--p); cursor:pointer; text-decoration:underline dotted; padding:2px 4px }
+.detail .edit:active { color:var(--c) }
+.range { display:flex; gap:6px; margin-left:auto }
+.range button { font-size:12px; padding:4px 12px; border-radius:8px; cursor:pointer;
+  border:1px solid var(--l); background:var(--cb2); color:var(--c2) }
+.range button.on { background:var(--p); color:#fff; border-color:var(--p) }
+.range button:disabled { opacity:.4; cursor:not-allowed; transform:none }
+.cards { display:flex; gap:12px; margin:14px 0 }
+.card { flex:1; background:var(--cb2); border-radius:12px; padding:14px 16px; box-shadow:var(--cs); }
+.card .k { font-size:12px; color:var(--c2) }
+.card .v { font-size:26px; font-weight:800; margin-top:4px }
+.card .v small { font-size:13px; font-weight:400; color:var(--c3) }
+.spark { margin:14px 0; background:var(--cb2); border-radius:12px; padding:14px 16px; box-shadow:var(--cs); }
+.spark .sp-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px }
+.spark .sp-head .k { font-size:12px; color:var(--c2) }
+.spark .sp-toggle { display:flex; gap:4px }
+.spark .sp-toggle button { font-size:11px; padding:3px 10px; border-radius:7px; cursor:pointer;
+  border:1px solid var(--l); background:transparent; color:var(--c2) }
+.spark .sp-toggle button.on { background:var(--p); color:#fff; border-color:var(--p) }
+.spark svg { width:100%; display:block }
+table { width:100%; border-collapse:collapse; margin-top:8px }
+th, td { text-align:left; padding:9px 10px; font-size:13px; border-bottom:1px solid var(--l) }
+th { color:var(--c2); font-weight:600; font-size:12px }
+.gold { color:var(--gold); font-weight:700 }
+.hitem { border:1px solid var(--l); border-radius:10px; margin-bottom:8px; overflow:hidden }
+.hhead { display:flex; align-items:center; gap:10px; padding:9px 12px; cursor:pointer; background:var(--cb2) }
+.hhead .w { font-weight:700; font-size:13px }
+.hhead .t { font-size:11px; color:var(--c3); margin-left:auto }
+.hbody { display:none; padding:8px 12px; font-size:12px; color:var(--c2); line-height:1.8 }
+.hbody.open { display:block }
+.empty { color:var(--c3); text-align:center; padding:40px 0; font-size:13px }
+/* 自定义弹窗（sandbox 无 allow-modals，不能用原生 confirm/prompt） */
+.modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.45); display:none;
+  align-items:center; justify-content:center; z-index:99; backdrop-filter:blur(2px); }
+.modal-overlay.show { display:flex; }
+.modal { width:340px; max-width:90vw; background:var(--modal-bg); border-radius:14px;
+  box-shadow:0 12px 40px rgba(0,0,0,0.35); padding:20px; }
+.modal-title { font-size:15px; font-weight:700; margin-bottom:12px; line-height:1.5 }
+.form-group { margin-bottom:14px; display:none }
+.form-label { display:block; font-size:12px; color:var(--c2); margin-bottom:6px }
+.form-input { width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--l);
+  background:var(--cb2); color:var(--c); font-size:14px; outline:none; }
+.form-input:focus { border-color:var(--p); }
+.modal-actions { display:flex; justify-content:flex-end; gap:8px }
+.btn { font-size:13px; padding:7px 18px; border-radius:8px; cursor:pointer;
+  border:1px solid var(--l); background:var(--cb2); color:var(--c2); }
+.btn:hover { color:var(--c); }
+.btn.primary { background:var(--p); color:#fff; border-color:var(--p); }
+.btn.danger { background:var(--r); color:#fff; border-color:var(--r); }
+.toast { position:fixed; bottom:28px; left:50%; transform:translateX(-50%);
+  background:rgba(17,24,39,0.9); color:#fff; font-size:13px; padding:9px 20px;
+  border-radius:999px; z-index:100; animation:tin .2s ease; }
+@keyframes tin { from { opacity:0; transform:translate(-50%,8px) } to { opacity:1; transform:translate(-50%,0) } }
+</style>
+</head>
+<body>
+<div class="hd">
+  <h1>选人器 · 数据统计</h1>
+  <div class="sub">玩过的群自动登记 · 删除群会清空数据</div>
+  <button class="refresh" onclick="refresh()">🔄 刷新</button>
+</div>
+<div class="wrap">
+  <div class="panel groups">
+    <button id="home-btn" class="home-btn on" onclick="goHome()">🏠 主页</button>
+    <div class="grp-head"><h2>群列表</h2><button class="add" onclick="addGroup()">+ 添加群聊</button></div>
+    <div id="glist"></div>
+  </div>
+  <div class="panel detail" id="detail">
+    <div class="empty">选择左侧群查看数据</div>
+  </div>
+</div>
+<div class="modal-overlay" id="md">
+  <div class="modal">
+    <div class="modal-title" id="md-title"></div>
+    <div class="form-group" id="md-input-wrap">
+      <label class="form-label" id="md-label"></label>
+      <input class="form-input" id="md-input">
+    </div>
+    <div class="modal-actions">
+      <button class="btn" id="md-cancel" onclick="resolveMD(false)">取消</button>
+      <button class="btn" id="md-ok" onclick="resolveMD(true)">确认</button>
+    </div>
+  </div>
+</div>
+<script>
+const B = window.AstrBotPluginPage;
+const $ = (s) => document.querySelector(s);
+let CUR = null;
+let RANGE = 'total';
+let SPARK_DAYS = 7;
+const RANGES = [['total','总'],['day','日'],['week','周'],['month','月'],['year','年']];
+
+function toast(msg) {
+  const e = document.createElement('div');
+  e.className = 'toast'; e.textContent = msg;
+  document.body.appendChild(e);
+  setTimeout(() => e.remove(), 2500);
+}
+window.addEventListener('unhandledrejection', (ev) => {
+  const m = (ev.reason && ev.reason.message) || ev.reason;
+  toast('请求失败: ' + m);
+});
+let mdResolve = null, mdMode = 'confirm';
+function showMD({ title, label = '', mode = 'confirm', value = '', danger = false }) {
+  $('#md-title').textContent = title;
+  $('#md-input-wrap').style.display = mode === 'prompt' ? 'block' : 'none';
+  $('#md-label').textContent = label;
+  $('#md-input').value = value;
+  $('#md-ok').className = 'btn' + (danger ? ' danger' : ' primary');
+  mdMode = mode;
+  $('#md').classList.add('show');
+  if (mode === 'prompt') setTimeout(() => $('#md-input').focus(), 0);
+  return new Promise(r => { mdResolve = r; });
+}
+function resolveMD(ok) {
+  $('#md').classList.remove('show');
+  if (!mdResolve) return;
+  const r = mdResolve; mdResolve = null;
+  r(ok ? (mdMode === 'prompt' ? $('#md-input').value.trim() : true)
+       : (mdMode === 'prompt' ? null : false));
+}
+function fmtTime(ts) {
+  if (!ts) return '暂无';
+  const d = Date.now() / 1000 - ts;
+  if (d < 60) return '刚刚活跃';
+  if (d < 3600) return Math.floor(d / 60) + ' 分钟前活跃';
+  if (d < 86400) return Math.floor(d / 3600) + ' 小时前活跃';
+  if (d < 86400 * 2) return '昨天活跃';
+  const t = new Date(ts * 1000);
+  return `${t.getMonth() + 1}月${t.getDate()}日活跃`;
+}
+function dispName(g) {
+  if (g.alias) return `${g.alias} <span class="orig">[${esc(g.group_name || g.gid)}]</span>`;
+  return esc(g.group_name || g.gid);
+}
+function plainName(g) { return g.alias || g.group_name || g.gid; }
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+async function loadGroups() {
+  const r = await B.apiGet('groups');
+  const list = (r && r.groups) || [];
+  const el = $('#glist');
+  if (!list.length) { el.innerHTML = '<div class="empty">还没有群玩过游戏</div>'; return; }
+  el.innerHTML = list.map(g => `
+    <div class="gitem ${CUR === g.gid ? 'on' : ''}" data-gid="${esc(g.gid)}" onclick="pick('${esc(g.gid)}')">
+      <div class="nm">${dispName(g)}</div>
+      <div class="gid">${esc(g.gid)}</div>
+      <div class="sub2">${g.player_count} 人 · ${g.total_plays} 局 · ${fmtTime(g.last_active_ts)}</div>
+      <div class="ops">
+        <button title="清空名单（保留登记与历史）" onclick="event.stopPropagation();doReset('${esc(g.gid)}','${esc(plainName(g))}')">重置</button>
+        <button title="移出登记并清空全部数据（不可恢复）" onclick="event.stopPropagation();doDelete('${esc(g.gid)}','${esc(plainName(g))}')">删除</button>
+      </div>
+    </div>`).join('');
+}
+function sparkSvg(points) {
+  const W = 560, H = 90, P = 10;
+  const max = Math.max(1, ...points.map(p => p.count));
+  const step = (W - P * 2) / Math.max(1, points.length - 1);
+  const xy = points.map((p, i) => [
+    P + i * step,
+    H - P - (p.count / max) * (H - P * 2),
+  ]);
+  const path = xy.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+  const area = `${path} L${(P + (points.length - 1) * step).toFixed(1)},${H - P} L${P},${H - P} Z`;
+  const dots = xy.map(([x, y], i) => `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.6" fill="var(--p)"><title>${points[i].date}：${points[i].count} 局</title></circle>`).join('');
+  const labels = points.map((p, i) => {
+    if (points.length <= 8 || i % Math.ceil(points.length / 8) === 0 || i === points.length - 1)
+      return `<text x="${(P + i * step).toFixed(1)}" y="${H - 2}" font-size="9" fill="var(--c3)" text-anchor="middle">${p.date}</text>`;
+    return '';
+  }).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="height:90px">
+    <path d="${area}" fill="rgba(96,165,250,0.12)"></path>
+    <path d="${path}" fill="none" stroke="var(--p)" stroke-width="2.5" stroke-linejoin="round"></path>
+    ${dots}${labels}</svg>`;
+}
+async function loadSpark(gid) {
+  const r = await B.apiGet(`groups/${gid}/sparkline`, { days: SPARK_DAYS });
+  const pts = (r && r.points) || [];
+  return sparkSvg(pts);
+}
+async function loadHomeSpark() {
+  const r = await B.apiGet('overview/sparkline', { days: SPARK_DAYS });
+  const pts = (r && r.points) || [];
+  return sparkSvg(pts);
+}
+const RANGE_LAB = (k) => (RANGES.find(x => x[0] === k) || [k, k])[1];
+function goHome() { CUR = null; document.querySelectorAll('.gitem').forEach(x => x.classList.remove('on')); loadHome(); }
+async function loadHome() {
+  $('#home-btn').classList.add('on');
+  try {
+  const r = await B.apiGet('overview', { range: RANGE });
+  if (!r) { $('#detail').innerHTML = '<div class="empty">加载失败（接口无返回）</div>'; return; }
+  const svg = await loadHomeSpark();
+  $('#detail').innerHTML = `
+    <div class="dt">
+      <span class="dn">📊 数据总览</span>
+      <span class="dgid">共 ${r.groups_count} 个群</span>
+      <div class="range">${RANGES.map(([k, lab]) => `<button class="${RANGE === k ? 'on' : ''}" onclick="setRange('${k}')">${lab}</button>`).join('')}</div>
+    </div>
+    <div class="cards">
+      <div class="card"><div class="k">参与群聊</div><div class="v">${r.groups_with_play}<small> / ${r.groups_count}</small></div></div>
+      <div class="card"><div class="k">总玩家（QQ 去重）</div><div class="v">${r.player_count}<small> 人</small></div></div>
+      <div class="card"><div class="k">${RANGE === 'total' ? '总游玩次数' : '范围内局数'}</div><div class="v">${r.plays_in_range}</div></div>
+    </div>
+    <div class="spark">
+      <div class="sp-head">
+        <span class="k">📈 每日局数趋势（全群）</span>
+        <div class="sp-toggle">
+          <button class="${SPARK_DAYS === 7 ? 'on' : ''}" onclick="setSpark(7)">7 天</button>
+          <button class="${SPARK_DAYS === 30 ? 'on' : ''}" onclick="setSpark(30)">30 天</button>
+        </div>
+      </div>
+      ${svg}
+    </div>
+    <h2 style="font-size:14px;color:var(--c2);margin:14px 0 4px">玩家总排行（${RANGE_LAB(RANGE)} · 前 10）</h2>
+    ${r.ranking.length ? `<table><thead><tr><th>显示名</th><th>QQ 号</th><th>被选中次数</th><th>参与群数</th></tr></thead><tbody>
+      ${r.ranking.map((p, i) => `<tr><td>${i === 0 ? '🥇 ' : i === 1 ? '🥈 ' : i === 2 ? '🥉 ' : ''}${esc(p.name)}</td><td>${esc(p.qq)}</td><td class="gold">${p.play_count}</td><td>${p.groups_count}</td></tr>`).join('')}
+    </tbody></table>` : '<div class="empty">该范围内暂无游玩记录</div>'}
+    <h2 style="font-size:14px;color:var(--c2);margin:16px 0 4px">最近 20 局（跨群）</h2>
+    ${r.history.length ? r.history.map(h => `
+      <div class="hitem">
+        <div class="hhead" onclick="this.nextElementSibling.classList.toggle('open')">
+          <span class="w gold">${esc(h.winner.name)}</span>
+          <span class="chip">${esc(h.group_display)}</span>
+          <span style="font-size:11px;color:var(--c3)">被选中 · ${h.players.length} 人${h.asker ? ` · ${esc(h.asker.name)} 提问` : ''}</span>
+          <span class="t">${fmtTime(h.ts)}</span>
+        </div>
+        <div class="hbody">${h.players.map(p => `${esc(p.name)}（${esc(p.qq)}）`).join('、')}</div>
+      </div>`).join('') : '<div class="empty">该范围内暂无历史记录</div>'}`
+  ;
+  } catch (e) {
+    $('#detail').innerHTML = `<div class="empty">主页加载失败：${esc(e && e.message || e)}</div>`;
+  }
+}
+async function pick(gid) {
+  CUR = gid;
+  $('#home-btn').classList.remove('on');
+  document.querySelectorAll('.gitem').forEach(x => x.classList.toggle('on', x.dataset.gid === gid));
+  try {
+  const r = await B.apiGet(`groups/${gid}/detail`, { range: RANGE });
+  if (!r) { $('#detail').innerHTML = '<div class="empty">加载失败（接口无返回）</div>'; return; }
+  const svg = await loadSpark(gid);
+  $('#detail').innerHTML = `
+    <div class="dt">
+      <span class="dn">${esc(r.alias || r.group_name || gid)}</span>
+      ${r.alias && r.group_name ? `<span class="dgid">[${esc(r.group_name)}]</span>` : ''}
+      <span class="dgid">${esc(gid)}</span>
+      <span class="edit" onclick="editAlias('${esc(gid)}','${esc(r.alias || r.group_name || '')}')">✏️ 别名</span>
+      <div class="range">${RANGES.map(([k, lab]) => `<button class="${RANGE === k ? 'on' : ''}" ${CUR ? '' : 'disabled'} onclick="setRange('${k}')">${lab}</button>`).join('')}</div>
+    </div>
+    <div class="cards">
+      <div class="card"><div class="k">${RANGE === 'total' ? '总游玩次数' : '范围内局数'}</div><div class="v">${r.plays_in_range}</div></div>
+      <div class="card"><div class="k">参与玩家</div><div class="v">${r.player_count}<small> 人</small></div></div>
+      <div class="card"><div class="k">状态</div><div class="v" style="font-size:16px">${r.registered ? '已登记' : '未登记'}${r.enabled ? '' : ' · 已关闭'}</div></div>
+    </div>
+    <div class="spark">
+      <div class="sp-head">
+        <span class="k">📈 每日局数趋势</span>
+        <div class="sp-toggle">
+          <button class="${SPARK_DAYS === 7 ? 'on' : ''}" onclick="setSpark(7)">7 天</button>
+          <button class="${SPARK_DAYS === 30 ? 'on' : ''}" onclick="setSpark(30)">30 天</button>
+        </div>
+      </div>
+      ${svg}
+    </div>
+    <h2 style="font-size:14px;color:var(--c2);margin:14px 0 4px">玩家统计（${RANGES.find(x => x[0] === RANGE)[1]}）</h2>
+    ${r.players.length ? `<table><thead><tr><th>显示名</th><th>QQ 号</th><th>被选中次数</th><th>当前连中</th></tr></thead><tbody>
+      ${r.players.map(p => `<tr><td>${esc(p.name)}</td><td>${esc(p.qq)}</td><td>${p.play_count}</td><td class="${p.streak > 0 ? 'gold' : ''}">${p.streak}</td></tr>`).join('')}
+    </tbody></table>` : '<div class="empty">当前名单为空</div>'}
+    <h2 style="font-size:14px;color:var(--c2);margin:16px 0 4px">最近 20 局</h2>
+    ${r.history.length ? r.history.map(h => `
+      <div class="hitem">
+        <div class="hhead" onclick="this.nextElementSibling.classList.toggle('open')">
+          <span class="w gold">${esc(h.winner.name)}</span>
+          <span style="font-size:11px;color:var(--c3)">被选中 · ${h.players.length} 人参与</span>
+          <span class="t">${fmtTime(h.ts)}</span>
+        </div>
+        <div class="hbody">${h.players.map(p => `${esc(p.name)}（${esc(p.qq)}）`).join('、')}</div>
+      </div>`).join('') : '<div class="empty">该范围内暂无历史记录</div>'}`
+  ;
+  } catch (e) {
+    $('#detail').innerHTML = `<div class="empty">群数据加载失败：${esc(e && e.message || e)}</div>`;
+  }
+}
+function setRange(r) { RANGE = r; if (CUR) pick(CUR); else loadHome(); }
+function setSpark(d) { SPARK_DAYS = d; if (CUR) pick(CUR); else loadHome(); }
+async function refresh() { toast('已刷新'); await loadGroups(); if (CUR) pick(CUR); else loadHome(); }
+async function addGroup() {
+  const gid = await showMD({ title: '添加群聊', label: '输入要登记的群号', mode: 'prompt', value: '' });
+  if (!gid) return;
+  await B.apiPost('groups/register', { gid });
+  toast(`已登记 ${gid}`);
+  await refresh();
+}
+async function doReset(gid, name) {
+  const ok = await showMD({ title: `确定清空「${name}」的当前名单吗？`, mode: 'confirm', value: '', danger: true });
+  if (!ok) return;
+  await B.apiPost(`groups/${gid}/reset`, {});
+  toast('名单已清空（登记与历史保留）');
+  if (CUR === gid) pick(gid); else refresh();
+}
+async function doDelete(gid, name) {
+  const ok = await showMD({ title: `确定删除「${name}」吗？\n将移出登记并清空全部数据，此操作不可恢复！`, mode: 'confirm', value: '', danger: true });
+  if (!ok) return;
+  await B.apiPost(`groups/${gid}/delete`, {});
+  toast('已删除');
+  if (CUR === gid) goHome(); else if (!CUR) loadHome();
+  await loadGroups();
+}
+async function editAlias(gid, cur) {
+  const alias = await showMD({ title: '设置群别名', label: '留空清除别名', mode: 'prompt', value: cur });
+  if (alias === null) return;
+  await B.apiPost(`groups/${gid}/alias`, { alias });
+  toast(alias ? '别名已保存' : '别名已清除');
+  await refresh();
+}
+(async () => {
+  if (!B) { $('#detail').innerHTML = '<div class="empty">bridge SDK 加载失败，请刷新页面</div>'; return; }
+  try {
+    const ctx = await B.ready();
+    const dark = (ctx && ctx.isDark === true) || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  } catch (e) {}
+  await loadGroups();
+  await loadHome();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,94 @@
+{
+  "strict_mode": {
+    "description": "准入模式（开 = 白名单）",
+    "type": "bool",
+    "default": false,
+    "hint": "开：仅登记过的群可玩（严格）；关：所有群默认可玩，可用关闭指令封锁指定群（宽松）。旧配置的 access_mode 字段自动兼容"
+  },
+  "theme": {
+    "description": "整体主题",
+    "type": "string",
+    "options": [
+      "dark",
+      "light"
+    ],
+    "labels": [
+      "深色",
+      "浅色"
+    ],
+    "default": "dark",
+    "hint": "深色或浅色整体配色（含轮盘、横转盘与垫字）"
+  },
+  "pick_mode": {
+    "description": "抽取人数",
+    "type": "string",
+    "options": [
+      "双人",
+      "单人"
+    ],
+    "labels": [
+      "两人",
+      "一人"
+    ],
+    "default": "双人",
+    "hint": "双人=回答者+提问者；单人=仅回答者"
+  },
+  "title_text": {
+    "description": "动画标题文字",
+    "type": "string",
+    "default": "选人器",
+    "hint": "显示在动画顶部标题栏，留空或超过 10 字符自动回退默认"
+  },
+  "answerer_label": {
+    "description": "「第一人」标签文字",
+    "type": "string",
+    "default": "回答者",
+    "hint": "显示在选中格垫底与回复文案中，1~3 个汉字，非法自动回退默认"
+  },
+  "asker_label": {
+    "description": "「第二人」标签文字",
+    "type": "string",
+    "default": "提问者",
+    "hint": "显示在横转盘上方与回复文案中，1~3 个汉字，非法自动回退默认"
+  },
+  "gif_duration_ms": {
+    "description": "GIF 总时长（毫秒）",
+    "type": "int",
+    "default": 6500,
+    "slider": {
+      "min": 3000,
+      "max": 12000,
+      "step": 100
+    },
+    "hint": "从开始滚动到定格的总时长，单位毫秒"
+  },
+  "weight_coef": {
+    "description": "连中降权系数",
+    "type": "float",
+    "default": 1.5,
+    "slider": {
+      "min": 0.5,
+      "max": 5.0,
+      "step": 0.1
+    },
+    "hint": "权重 = 1 / (1 + 连中次数 × 系数)，系数越大连中概率降得越快"
+  },
+  "text_mode": {
+    "description": "文本模式",
+    "type": "bool",
+    "default": false,
+    "hint": "开=不生成 GIF 动画，纯文本极速播报（与抽取人数无关，可叠加）"
+  },
+  "mention_enabled": {
+    "description": "艾特提醒",
+    "type": "bool",
+    "default": true,
+    "hint": "开=抽选后另发一条艾特消息提醒被选中者（双人模式含提问者）；关=不发艾特消息"
+  },
+  "max_players": {
+    "description": "报名人数上限",
+    "type": "int",
+    "default": 20,
+    "hint": "满员后无法继续报名；必须 ≥2，不设上限，随意填"
+  }
+}
