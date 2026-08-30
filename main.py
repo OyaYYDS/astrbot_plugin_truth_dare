@@ -28,7 +28,7 @@ PLUGIN_NAME = "astrbot_plugin_truth_dare"
     PLUGIN_NAME,
     "Oya & Claude",
     "QQ 群选人器：报名、竖向滚轮动画选人、真艾特播报，支持连中降权与多群独立名单。",
-    "v0.2.0",
+    "0.2.0",
 )
 class TruthDarePlugin(Star):
     def __init__(self, context: Context, config=None):

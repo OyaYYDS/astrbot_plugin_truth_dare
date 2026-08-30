@@ -2,7 +2,7 @@ name: astrbot_plugin_truth_dare
 display_name: 选人器
 short_desc: 群随机选人：3D 滚轮动画抽选，一人/两人/纯文本三种模式
 desc: QQ 群随机选人插件：报名、两幕动画选人（3D 菱形滚轮选回答者 + 昵称首字横盘选提问者）、真艾特点名，支持连中降权、多群隔离、深浅双主题、历史统计页与群内查询指令。
-version: v0.2.0
+version: 0.2.0
 author: Oya & Claude
 repo: https://github.com/OyaYYDS/astrbot_plugin_truth_dare
 astrbot_version: ">=4.16,<5"
