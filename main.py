@@ -111,6 +111,7 @@ class TruthDarePlugin(Star):
 
     @filter.command("luckyadd", alias={"参加选人器"})
     async def luckyadd(self, event: AstrMessageEvent, name: GreedyStr):
+        """报名参加选人器，可自定义显示名"""
         gid = self._gid(event)
         data = store.load_group(gid)
         ok, reply = self._gate(gid, data)
@@ -154,6 +155,7 @@ class TruthDarePlugin(Star):
 
     @filter.command("luckyplay", alias={"选人器开始"})
     async def luckyplay(self, event: AstrMessageEvent):
+        """开始抽选（按当前模式播报滚轮动画或纯文本）"""
         gid = self._gid(event)
         data = store.load_group(gid)
         ok, reply = self._gate(gid, data)
@@ -271,17 +273,20 @@ class TruthDarePlugin(Star):
 
     @filter.command("luckyhelp", alias={"选人器帮助"})
     async def luckyhelp(self, event: AstrMessageEvent):
+        """玩法与常用指令说明"""
         yield event.plain_result(CFG.get_reply("help_member"))
 
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("luckycmds", alias={"选人器指令"})
     async def luckycmds(self, event: AstrMessageEvent):
+        """管理员：全部管理指令清单"""
         yield event.plain_result(CFG.get_reply("help_admin"))
 
     # ---------- 模式/动画切换（按群存储覆盖，所有人可用） ----------
 
     @filter.command("luckymode", alias={"选人器人数"})
     async def luckymode(self, event: AstrMessageEvent, arg: GreedyStr):
+        """查看或切换抽取人数（1=一人，2=两人）"""
         gid = self._gid(event)
         data = store.load_group(gid)
         arg = (arg or "").strip()
@@ -303,6 +308,7 @@ class TruthDarePlugin(Star):
 
     @filter.command("luckyanim", alias={"选人器动画"})
     async def luckyanim(self, event: AstrMessageEvent, arg: GreedyStr):
+        """查看或切换动画开关（开=GIF，关=纯文本极速）"""
         gid = self._gid(event)
         data = store.load_group(gid)
         arg = (arg or "").strip()
@@ -324,6 +330,7 @@ class TruthDarePlugin(Star):
 
     @filter.command("luckyrank", alias={"选人器排行榜"})
     async def luckyrank(self, event: AstrMessageEvent):
+        """本群战绩统计（前 5 排行）"""
         gid = self._gid(event)
         data = store.load_group(gid)
         hist = data.get("history", [])
@@ -348,6 +355,7 @@ class TruthDarePlugin(Star):
 
     @filter.command("luckygrank", alias={"选人器群排行榜"})
     async def luckygrank(self, event: AstrMessageEvent):
+        """全群战绩统计（跨群前 5 排行）"""
         counts: dict[str, dict] = {}
         total = 0
         groups = 0
@@ -377,6 +385,7 @@ class TruthDarePlugin(Star):
 
     @filter.command("luckystatus", alias={"选人器状态"})
     async def luckystatus(self, event: AstrMessageEvent):
+        """本群状态自查（开启/登记/模式/动画/人数）"""
         gid = self._gid(event)
         data = store.load_group(gid)
         mode = data.get("pick_mode") or self._pick_mode()
@@ -392,6 +401,7 @@ class TruthDarePlugin(Star):
 
     @filter.command("luckylist", alias={"选人器玩家"})
     async def luckylist(self, event: AstrMessageEvent):
+        """查看当前名单"""
         gid = self._gid(event)
         data = store.load_group(gid)
         ok, reply = self._gate(gid, data)
@@ -410,6 +420,7 @@ class TruthDarePlugin(Star):
 
     @filter.command("luckyquit", alias={"选人器退出"})
     async def luckyquit(self, event: AstrMessageEvent):
+        """退出游戏"""
         gid = self._gid(event)
         data = store.load_group(gid)
         ok, reply = self._gate(gid, data)
@@ -431,6 +442,7 @@ class TruthDarePlugin(Star):
 
     @filter.command("luckyreset", alias={"选人器重置"})
     async def luckyreset(self, event: AstrMessageEvent):
+        """清空本群名单"""
         gid = self._gid(event)
         data = store.load_group(gid)
         ok, reply = self._gate(gid, data)
@@ -447,6 +459,7 @@ class TruthDarePlugin(Star):
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("luckyremove", alias={"选人器玩家移除"})
     async def luckyremove(self, event: AstrMessageEvent, target: GreedyStr):
+        """管理员：按名字或 QQ 号移除玩家"""
         gid = self._gid(event)
         data = store.load_group(gid)
         ok, reply = self._gate(gid, data)
@@ -474,6 +487,7 @@ class TruthDarePlugin(Star):
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("luckydisable", alias={"选人器关闭"})
     async def luckydisable(self, event: AstrMessageEvent):
+        """管理员：关闭本群玩法"""
         gid = self._gid(event)
         data = store.load_group(gid)
         ok, reply = self._gate(gid, data)
@@ -489,6 +503,7 @@ class TruthDarePlugin(Star):
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("luckyenable", alias={"选人器开启"})
     async def luckyenable(self, event: AstrMessageEvent):
+        """管理员：开启本群玩法"""
         gid = self._gid(event)
         data = store.load_group(gid)
         data["enabled"] = True
@@ -501,6 +516,7 @@ class TruthDarePlugin(Star):
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("luckyregister", alias={"选人器群添加"})
     async def luckyregister(self, event: AstrMessageEvent):
+        """管理员：登记本群（严格模式准入）"""
         gid = self._gid(event)
         store.register_group(gid)
         yield event.plain_result(CFG.get_reply("register_ok"))
@@ -508,6 +524,7 @@ class TruthDarePlugin(Star):
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("luckyunregister", alias={"选人器群删除"})
     async def luckyunregister(self, event: AstrMessageEvent):
+        """管理员：移出登记并清空本群数据"""
         gid = self._gid(event)
         store.unregister_group(gid)
         yield event.plain_result(CFG.get_reply("unregister_ok"))
