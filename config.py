@@ -6,10 +6,10 @@
 """
 
 # ---------- 画布 ----------
-CANVAS_W = 560
-CANVAS_H = 560
-TITLE_H = 64
-FOOTER_H = 56
+CANVAS_W = 150
+CANVAS_H = 150
+TITLE_H = 17
+FOOTER_H = 15
 ROW_VIEW = 4.5
 
 # ---------- 动画（两幕：第一幕选回答者 → 第二幕选提问者） ----------
@@ -36,9 +36,9 @@ BASE_FRAME_MS = 45        # 基准帧时长；配置总时长按比例缩放全�
 # 菱形剖面：中心格放大 LENS_SCALE 倍、邻格/次邻格收缩（严格单调，总量≈4.5 格视口）
 LENS_SCALE = 2.0
 # 横转盘
-WHEEL_CELL = 120          # 数字格宽（一位/两位数均可容纳）
+WHEEL_CELL = 32          # 数字格宽（一位/两位数均可容纳）
 # 角色标签（垫在金字下方，≤3 个汉字，可配置；回答者/提问者垫字同字号同色系）
-ANSWERER_FONT = 150
+ANSWERER_FONT = 40
 LABEL_ALPHA_MAX = 0.5    # 垫字最大不透明度：窄昵称时垫字大片露出会显「底色变深」，封顶 50% 只留影子感
 TITLE_DEFAULT = "选人器"   # 动画顶部标题（可配置，≤10 字符，留空/超长回退默认）
 ANSWERER_LABEL_DEFAULT = "回答者"
@@ -85,7 +85,7 @@ THEMES = {
 
 # ---------- 选中样式 ----------
 SELECTED_GOLD = (232, 190, 80)
-SELECTED_BOX_WIDTH = 14
+SELECTED_BOX_WIDTH = 4
 SELECTED_TEXT_STROKE = 0    # 选中字描边宽度（0=关闭）
 
 # ---------- 横转盘金属红 / 提问者（两主题共用） ----------
