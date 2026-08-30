@@ -176,6 +176,7 @@ def resolve_colors(plugin_cfg) -> dict:
         bar_opaque = str(plugin_cfg.get("bar_mode", "不透明")) != "透明"
     colors["bar_opaque"] = bar_opaque
     colors["background"] = None  # 背景图功能预留入口
+    colors["res_scale"] = res_of(plugin_cfg) / 150  # 分辨率因子（renderer 全量等比缩放）
     return colors
 
 
@@ -249,3 +250,18 @@ def max_players_of(plugin_cfg) -> int:
         return max(2, int(plugin_cfg.get("max_players", MAX_PLAYERS)))
     except (TypeError, ValueError):
         return MAX_PLAYERS
+
+
+RES_OPTIONS = (150, 300)   # 动画分辨率档位：标准 / 高清（点开不糊）
+RES_DEFAULT = 150
+
+
+def res_of(plugin_cfg) -> int:
+    """动画分辨率档位（150 标准 / 300 高清，非法值回退 150）。"""
+    if plugin_cfg is None:
+        return RES_DEFAULT
+    try:
+        r = int(plugin_cfg.get("resolution", RES_DEFAULT))
+    except (TypeError, ValueError):
+        return RES_DEFAULT
+    return r if r in RES_OPTIONS else RES_DEFAULT

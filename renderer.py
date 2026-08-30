@@ -75,13 +75,13 @@ def _fit_font(text: str, max_w: int) -> int:
     return size
 
 
-def _clip_name(raw: str) -> str:
+def _clip_name(raw: str, sc: float = 1.0) -> str:
     """按像素宽度截断显示名（设计文档 10.7，不做简单 [:N] 截断）。"""
     raw = _sanitize_name(raw)
     if len(raw) <= CFG.NAME_MAX_CHARS:
         return raw
-    font = load_font(13)
-    limit = CFG.CANVAS_W - 13
+    font = load_font(int(13 * sc))
+    limit = int(CFG.CANVAS_W * sc) - int(13 * sc)
     if font.getlength(raw) <= limit:
         return raw
     ell = "…"
@@ -140,40 +140,47 @@ def _font_for(d: float, s: float) -> int:
 
 # ---------- 布局辅助 ----------
 
-def _move_to(s: float, row_h: float, view_top: float, center_y: float) -> float:
+def _move_to(s: float, row_h: float, view_top: float, center_y: float,
+             sc: float = 1.0) -> float:
     """第二幕金框行上移目标：约 1.5 格，保证高格不顶标题栏。"""
-    return max(center_y - 1.5 * row_h, view_top + 4 + s * row_h / 2)
+    return max(center_y - 1.5 * row_h,
+               view_top + max(1, int(4 * sc)) + s * row_h / 2)
 
 
-def _wheel_y0(s: float, row_h: float, view_bottom: float, move_to: float) -> int:
+def _wheel_y0(s: float, row_h: float, view_bottom: float, move_to: float,
+              sc: float = 1.0) -> int:
     """横转条 y0：金框行下缘与下栏中点，再下移（条底边与下栏空隙）的一半。"""
-    mid = int((move_to + s * row_h / 2 + view_bottom) / 2 - 14)
-    return mid + (view_bottom - (mid + 28)) // 2
+    mid = int((move_to + s * row_h / 2 + view_bottom) / 2 - int(14 * sc))
+    return mid + (view_bottom - (mid + int(28 * sc))) // 2
 
 
 # ---------- 单元素绘制 ----------
 
 def _draw_base(colors: dict, footer_text: str, title: str | None = None) -> Image.Image:
     """底图：背景图（预留入口，当前恒 None）或纯色 + 上下栏（可透明模式）。"""
-    view_top = CFG.TITLE_H
-    view_bottom = CFG.CANVAS_H - CFG.FOOTER_H
+    sc = colors.get("res_scale", 1.0)
+    cw, ch = int(CFG.CANVAS_W * sc), int(CFG.CANVAS_H * sc)
+    fs = lambda s_: load_font(int(s_ * sc))
+    lw = max(1, int(1 * sc))
+    view_top = int(CFG.TITLE_H * sc)
+    view_bottom = ch - int(CFG.FOOTER_H * sc)
     bg = colors.get("background")
     if bg is not None:
-        img = bg.convert("RGB").resize((CFG.CANVAS_W, CFG.CANVAS_H))
+        img = bg.convert("RGB").resize((cw, ch))
     else:
-        img = Image.new("RGB", (CFG.CANVAS_W, CFG.CANVAS_H), colors["bg"])
+        img = Image.new("RGB", (cw, ch), colors["bg"])
     d = ImageDraw.Draw(img)
     if bool(colors.get("bar_opaque", True)):
-        d.rectangle([0, 0, CFG.CANVAS_W, CFG.TITLE_H], fill=colors["title_bg"])
-        d.line([0, CFG.TITLE_H - 1, CFG.CANVAS_W, CFG.TITLE_H - 1], fill=colors["line"], width=1)
-        d.rectangle([0, view_bottom, CFG.CANVAS_W, CFG.CANVAS_H], fill=colors["title_bg"])
-        d.line([0, view_bottom, CFG.CANVAS_W, view_bottom], fill=colors["line"], width=1)
+        d.rectangle([0, 0, cw, view_top], fill=colors["title_bg"])
+        d.line([0, view_top - 1, cw, view_top - 1], fill=colors["line"], width=lw)
+        d.rectangle([0, view_bottom, cw, ch], fill=colors["title_bg"])
+        d.line([0, view_bottom, cw, view_bottom], fill=colors["line"], width=lw)
     # 标题同样剥离字体画不出的字符（emoji → 方框），全空回退默认
     title = "".join(c for c in (title or CFG.TITLE_DEFAULT) if ord(c) <= 0xFFFF) or CFG.TITLE_DEFAULT
-    d.text((CFG.CANVAS_W / 2, CFG.TITLE_H / 2), title,
-           fill=colors["title_text"], font=load_font(7), anchor="mm")
-    d.text((CFG.CANVAS_W / 2, view_bottom + CFG.FOOTER_H / 2), footer_text,
-           fill=colors["title_text"], font=load_font(6), anchor="mm")
+    d.text((cw / 2, view_top / 2), title,
+           fill=colors["title_text"], font=fs(7), anchor="mm")
+    d.text((cw / 2, view_bottom + int(CFG.FOOTER_H * sc) / 2), footer_text,
+           fill=colors["title_text"], font=fs(6), anchor="mm")
     return img
 
 
@@ -187,32 +194,36 @@ def _draw_row(img: Image.Image, names: list[str], cy: float, r: int, size: int,
     图层序：底色 < label（回答者垫字）< 名字 < 金框。
     淡出用向 bg 纯色混合的伪透明（背景图功能上线前有效；届时改真 alpha）。
     """
-    view_top = CFG.TITLE_H
-    view_bottom = CFG.CANVAS_H - CFG.FOOTER_H
+    sc = colors.get("res_scale", 1.0)
+    cw = int(CFG.CANVAS_W * sc)
+    fs = lambda s_: load_font(int(s_ * sc))
+    lw = max(1, int(1 * sc))
+    view_top = int(CFG.TITLE_H * sc)
+    view_bottom = int(CFG.CANVAS_H * sc) - int(CFG.FOOTER_H * sc)
     top = cy - row_h / 2
-    layer = Image.new("RGB", (CFG.CANVAS_W, int(row_h) + 2))
+    layer = Image.new("RGB", (cw, int(row_h) + int(2 * sc)))
     ld = ImageDraw.Draw(layer)
     zebra = colors["zebra_a"] if r % 2 == 0 else colors["zebra_b"]
-    ld.rectangle([0, 0, CFG.CANVAS_W, layer.height], fill=zebra)
-    ld.line([0, 0, CFG.CANVAS_W, 0], fill=colors["line"], width=1)
+    ld.rectangle([0, 0, cw, layer.height], fill=zebra)
+    ld.line([0, 0, cw, 0], fill=colors["line"], width=lw)
     if label and label_alpha > 0:
         label_alpha = min(label_alpha, CFG.LABEL_ALPHA_MAX)   # 封顶 50%：只留影子感
         lc = tuple(int(zebra[i] * (1 - label_alpha) + label_color[i] * label_alpha)
                    for i in range(3))
-        ld.text((CFG.CANVAS_W / 2, layer.height / 2 + label_dy), label, fill=lc,
-                font=load_font(label_size), anchor="mm")
-    name = _clip_name(names[r % len(names)])
+        ld.text((cw / 2, layer.height / 2 + label_dy), label, fill=lc,
+                font=fs(label_size), anchor="mm")
+    name = _clip_name(names[r % len(names)], sc)
     if gold:
         color = colors["selected"]["gold"]
         stroke = colors["selected"]["stroke"]
     else:
         color = colors["text"]
         stroke = 0
-    ld.text((CFG.CANVAS_W / 2, layer.height / 2), name, fill=color, font=load_font(size),
+    ld.text((cw / 2, layer.height / 2), name, fill=color, font=fs(size),
             anchor="mm", stroke_width=stroke,
             stroke_fill=colors["selected"]["gold"] if stroke else None)
     if selected:
-        ld.rectangle([0, 2, CFG.CANVAS_W - 1, layer.height - 3],
+        ld.rectangle([0, int(2 * sc), cw - 1, layer.height - int(3 * sc)],
                      outline=colors["selected"]["gold"],
                      width=colors["selected"]["box_width"])
     if alpha < 1.0:
@@ -222,7 +233,7 @@ def _draw_row(img: Image.Image, names: list[str], cy: float, r: int, size: int,
         return
     src_y0 = max(0, view_top - y_top)
     src_y1 = min(layer.height, view_bottom - y_top)
-    img.paste(layer.crop((0, src_y0, CFG.CANVAS_W, src_y1)), (0, max(y_top, view_top)))
+    img.paste(layer.crop((0, src_y0, cw, src_y1)), (0, max(y_top, view_top)))
 
 
 def _draw_hwheel_layer(names: list[str], x_offset: float, y0: int, colors: dict,
@@ -232,17 +243,21 @@ def _draw_hwheel_layer(names: list[str], x_offset: float, y0: int, colors: dict,
     fade_others>0：非中心格向画布底淡出（1.0=完全消失）。
     金属红指示框固定在画布中心槽；终点帧中心格红底、首字提亮。
     """
-    cx = CFG.CANVAS_W // 2
-    y1 = y0 + 28
-    layer = Image.new("RGBA", (CFG.CANVAS_W, CFG.CANVAS_H), (0, 0, 0, 0))
+    sc = colors.get("res_scale", 1.0)
+    cw, ch = int(CFG.CANVAS_W * sc), int(CFG.CANVAS_H * sc)
+    cell = int(CFG.WHEEL_CELL * sc)
+    fs = lambda s_: load_font(int(s_ * sc))
+    cx = cw // 2
+    y1 = y0 + int(28 * sc)
+    layer = Image.new("RGBA", (cw, ch), (0, 0, 0, 0))
     d = ImageDraw.Draw(layer)
     n = len(names)
-    start_k = math.floor(x_offset / CFG.WHEEL_CELL) - 3
+    start_k = math.floor(x_offset / cell) - 3
     for k in range(start_k, start_k + 8):
         ch = _first_char(names[k % n])
-        gx = cx + x_offset - (k + 0.5) * CFG.WHEEL_CELL
-        box = [gx - CFG.WHEEL_CELL / 2, y0, gx + CFG.WHEEL_CELL / 2, y1]
-        is_center = abs(gx - cx) < CFG.WHEEL_CELL / 2
+        gx = cx + x_offset - (k + 0.5) * cell
+        box = [gx - cell / 2, y0, gx + cell / 2, y1]
+        is_center = abs(gx - cx) < cell / 2
         cell_fill = colors["hw_cell"]
         ch_color = colors["hw_num"]
         if fade_others > 0 and not is_center:
@@ -255,12 +270,13 @@ def _draw_hwheel_layer(names: list[str], x_offset: float, y0: int, colors: dict,
             cell_fill = CFG.WHEEL_RED_BG   # 红底先画，压在首字下面
             ch_color = CFG.WHEEL_NUM_FINAL
         d.rectangle(box, fill=cell_fill)
-        d.line([box[0], y0, box[0], y1], fill=colors["hw_line"], width=1)
-        d.text((gx, (y0 + y1) / 2), ch, fill=ch_color, font=load_font(19), anchor="mm")
-    box = [cx - CFG.WHEEL_CELL / 2, y0, cx + CFG.WHEEL_CELL / 2, y1]
-    d.rectangle(box, outline=CFG.WHEEL_RED_HI, width=2)
-    d.rectangle([box[0] + 1, box[3] - 3, box[2], box[3]], outline=CFG.WHEEL_RED_LO, width=2)
-    d.rectangle(box, outline=CFG.WHEEL_RED, width=2)
+        d.line([box[0], y0, box[0], y1], fill=colors["hw_line"], width=max(1, int(1 * sc)))
+        d.text((gx, (y0 + y1) / 2), ch, fill=ch_color, font=fs(19), anchor="mm")
+    box = [cx - cell / 2, y0, cx + cell / 2, y1]
+    d.rectangle(box, outline=CFG.WHEEL_RED_HI, width=max(2, int(2 * sc)))
+    d.rectangle([box[0] + max(1, int(1 * sc)), box[3] - max(1, int(3 * sc)), box[2], box[3]],
+                outline=CFG.WHEEL_RED_LO, width=max(2, int(2 * sc)))
+    d.rectangle(box, outline=CFG.WHEEL_RED, width=max(2, int(2 * sc)))
     return layer
 
 
@@ -274,27 +290,32 @@ def _draw_reveal(img: Image.Image, names: list[str], asker_idx: int, t: float,
     整串从「首字居中」连续左滑到「整串居中」，新字从右缘滚入；后段 1..2 放大 72→96）；
     alpha=「提问者」垫字显现（0→50%，展开完成后走第一幕垫字逻辑）。
     """
-    cx = CFG.CANVAS_W // 2
-    h1 = CFG.LENS_SCALE * row_h                       # 金框高度
-    h0 = 27.9                                        # 横盘条原高
+    sc = colors.get("res_scale", 1.0)
+    cw, ch = int(CFG.CANVAS_W * sc), int(CFG.CANVAS_H * sc)
+    cell = int(CFG.WHEEL_CELL * sc)
+    fs = lambda s_: load_font(int(s_ * sc))
+    cx = cw // 2
+    h1 = CFG.LENS_SCALE * row_h                       # 金框高度（row_h 已按分辨率缩放）
+    h0 = 27.9 * sc                                    # 横盘条原高
     y_mid0 = y0 + h0 / 2                              # 横盘条中心
-    y_mid1 = (move_to + h1 / 2 + CFG.CANVAS_H - CFG.FOOTER_H) / 2  # 金框下缘与下栏的中点
+    y_mid1 = (move_to + h1 / 2 + ch - int(CFG.FOOTER_H * sc)) / 2  # 金框下缘与下栏的中点
     h = h0 + (h1 - h0) * t
     y_mid = y_mid0 + (y_mid1 - y_mid0) * t
-    half = CFG.WHEEL_CELL / 2 + (CFG.CANVAS_W / 2 - CFG.WHEEL_CELL / 2) * t
+    half = cell / 2 + (cw / 2 - cell / 2) * t
     box = [cx - half, y_mid - h / 2, cx + half, y_mid + h / 2]
     d = ImageDraw.Draw(img)
     d.rectangle(box, fill=CFG.WHEEL_RED_BG)   # 选定红底保留
-    d.rectangle(box, outline=CFG.WHEEL_RED_HI, width=2)
-    d.rectangle([box[0] + 1, box[3] - 3, box[2], box[3]], outline=CFG.WHEEL_RED_LO, width=2)
-    d.rectangle(box, outline=CFG.WHEEL_RED, width=2)
+    d.rectangle(box, outline=CFG.WHEEL_RED_HI, width=max(2, int(2 * sc)))
+    d.rectangle([box[0] + max(1, int(1 * sc)), box[3] - max(1, int(3 * sc)), box[2], box[3]],
+                outline=CFG.WHEEL_RED_LO, width=max(2, int(2 * sc)))
+    d.rectangle(box, outline=CFG.WHEEL_RED, width=max(2, int(2 * sc)))
     name = _sanitize_name(names[asker_idx])
     reveal = min(1.0, t_name)
     grow = max(0.0, t_name - 1.0)
     size = int(19 + 6 * grow)
-    if load_font(size).getlength(name) > CFG.CANVAS_W - 16:
-        size = _fit_font(name, CFG.CANVAS_W - 16)
-    name_w = load_font(size).getlength(name)
+    if fs(size).getlength(name) > cw - max(1, int(16 * sc)):
+        size = _fit_font(name, cw - max(1, int(16 * sc)))
+    name_w = fs(size).getlength(name)
     name_cx = cx + (name_w - size) / 2 * (1.0 - reveal)
     # 提问者垫字：与回答者垫字同色同字号（150px），向红底混合渐显（0→50%）；
     # 仅 alpha>0 时绘制，且裁剪到格子内
@@ -302,16 +323,16 @@ def _draw_reveal(img: Image.Image, names: list[str], asker_idx: int, t: float,
     if a > 0:
         wm = tuple(int(CFG.WHEEL_RED_BG[i] * (1 - a) + colors["answerer"][i] * a)
                    for i in range(3))
-        wm_layer = Image.new("RGBA", (CFG.CANVAS_W, CFG.CANVAS_H), (0, 0, 0, 0))
+        wm_layer = Image.new("RGBA", (cw, ch), (0, 0, 0, 0))
         wd = ImageDraw.Draw(wm_layer)
-        wd.text((cx, y_mid), asker_label, fill=wm, font=load_font(CFG.ANSWERER_FONT),
+        wd.text((cx, y_mid), asker_label, fill=wm, font=fs(CFG.ANSWERER_FONT),
                 anchor="mm")
         crop = wm_layer.crop((int(box[0]), int(box[1]), int(box[2]), int(box[3])))
         img.paste(crop, (int(box[0]), int(box[1])), crop)
     # 全名最后画（压垫字之上），明亮色；裁剪到格子内（滚动入画）
-    nm_layer = Image.new("RGBA", (CFG.CANVAS_W, CFG.CANVAS_H), (0, 0, 0, 0))
+    nm_layer = Image.new("RGBA", (cw, ch), (0, 0, 0, 0))
     nd = ImageDraw.Draw(nm_layer)
-    nd.text((name_cx, y_mid), name, fill=CFG.WHEEL_NUM_FINAL, font=load_font(size),
+    nd.text((name_cx, y_mid), name, fill=CFG.WHEEL_NUM_FINAL, font=fs(size),
             anchor="mm")
     crop = nm_layer.crop((int(box[0]), int(box[1]), int(box[2]), int(box[3])))
     img.paste(crop, (int(box[0]), int(box[1])), crop)
@@ -322,10 +343,11 @@ def _act1_static_frame(colors: dict, footer: str, title: str, names: list[str],
                        label: str, label_a: int, label_color: tuple,
                        label_alpha: float) -> Image.Image:
     """第一幕静止帧：滚动停在 target，金框金字；垫字按 label_alpha 渐显。"""
+    sc = colors.get("res_scale", 1.0)
     off = float(CFG.CYCLE_ROUNDS * n + target)
     img = _draw_base(colors, footer, title)
-    view_top = CFG.TITLE_H
-    view_bottom = CFG.CANVAS_H - CFG.FOOTER_H
+    view_top = int(CFG.TITLE_H * sc)
+    view_bottom = int(CFG.CANVAS_H * sc) - int(CFG.FOOTER_H * sc)
     first = math.floor(off) - 3
     for r in range(first, first + 8):
         d = r - off
@@ -339,7 +361,7 @@ def _act1_static_frame(colors: dict, footer: str, title: str, names: list[str],
                   label_size=label_a if gold else None,
                   label_color=label_color if gold else None,
                   label_alpha=label_alpha if gold else 0.0,
-                  label_dy=-1)
+                  label_dy=-max(1, int(1 * sc)))
     return img
 
 
@@ -354,8 +376,11 @@ def _build_frames(names: list[str], target: int, asker_idx: int, colors: dict,
     """
     n = len(names)
     s = CFG.LENS_SCALE
-    view_top = CFG.TITLE_H
-    view_bottom = CFG.CANVAS_H - CFG.FOOTER_H
+    sc = colors.get("res_scale", 1.0)
+    cw, ch = int(CFG.CANVAS_W * sc), int(CFG.CANVAS_H * sc)
+    _ldy = -max(1, int(1 * sc))
+    view_top = int(CFG.TITLE_H * sc)
+    view_bottom = int(CFG.CANVAS_H * sc) - int(CFG.FOOTER_H * sc)
     view_h = view_bottom - view_top
     row_h = view_h / CFG.ROW_VIEW
     center_y = (view_top + view_bottom) / 2
@@ -425,8 +450,8 @@ def _build_frames(names: list[str], target: int, asker_idx: int, colors: dict,
         return frames
 
     # ===== 第二幕 =====
-    move_to = _move_to(s, row_h, view_top, center_y)
-    wheel_y0 = _wheel_y0(s, row_h, view_bottom, move_to)
+    move_to = _move_to(s, row_h, view_top, center_y, sc)
+    wheel_y0 = _wheel_y0(s, row_h, view_bottom, move_to, sc)
 
     # ① 其他行淡出（与第一幕定格帧严格同位；垫字自定格起保持显现）
     for f in range(CFG.FADE_FRAMES):
@@ -441,7 +466,7 @@ def _build_frames(names: list[str], target: int, asker_idx: int, colors: dict,
         _draw_row(img, names, center_y, target, _font_for(0, s), s * row_h,
                   colors, selected=True, gold=True, label=answerer_label,
                   label_size=label_a, label_color=label_color,
-                  label_alpha=1.0, label_dy=-1)
+                  label_alpha=1.0, label_dy=_ldy)
         frames.append((img, 70))
 
     # ② 选中格上移 1.5 格（格高、字号、金框、垫字均不变，跟随上移）
@@ -451,7 +476,7 @@ def _build_frames(names: list[str], target: int, asker_idx: int, colors: dict,
         img = _draw_base(colors, footer, title)
         _draw_row(img, names, cy, target, _font_for(0, s), s * row_h, colors,
                   selected=True, gold=True, label=answerer_label, label_size=label_a,
-                  label_color=label_color, label_alpha=1.0, label_dy=-1)
+                  label_color=label_color, label_alpha=1.0, label_dy=_ldy)
         frames.append((img, 70))
 
     # ③ 横转盘从右侧滑入
@@ -462,10 +487,10 @@ def _build_frames(names: list[str], target: int, asker_idx: int, colors: dict,
         img = _draw_base(colors, footer, title)
         _draw_row(img, names, move_to, target, _font_for(0, s), s * row_h, colors,
                   selected=True, gold=True, label=answerer_label, label_size=label_a,
-                  label_color=label_color, label_alpha=1.0, label_dy=-1)
-        vis = int(CFG.CANVAS_W * t)   # 可见宽度逐步展开 → 从右入画
-        crop = wheel_layer.crop((CFG.CANVAS_W - vis, 0, CFG.CANVAS_W, CFG.CANVAS_H))
-        img.paste(crop, (CFG.CANVAS_W - vis, 0), crop)   # RGBA 必须带 mask 粘贴
+                  label_color=label_color, label_alpha=1.0, label_dy=_ldy)
+        vis = int(cw * t)   # 可见宽度逐步展开 → 从右入画
+        crop = wheel_layer.crop((cw - vis, 0, cw, ch))
+        img.paste(crop, (cw - vis, 0), crop)   # RGBA 必须带 mask 粘贴
         frames.append((img, 70))
 
     # ④ 横转盘滚动（多滚 3 整圈；首字格停在中心红框）
@@ -488,7 +513,7 @@ def _build_frames(names: list[str], target: int, asker_idx: int, colors: dict,
         img = _draw_base(colors, footer, title)
         _draw_row(img, names, move_to, target, _font_for(0, s), s * row_h, colors,
                   selected=True, gold=True, label=answerer_label, label_size=label_a,
-                  label_color=label_color, label_alpha=1.0, label_dy=-1)
+                  label_color=label_color, label_alpha=1.0, label_dy=_ldy)
         layer = _draw_hwheel_layer(names, so % period, wheel_y0, colors, final=last)
         img.paste(layer, (0, 0), layer)   # RGBA 必须带 mask 粘贴
         if last:
@@ -501,7 +526,7 @@ def _build_frames(names: list[str], target: int, asker_idx: int, colors: dict,
         img = _draw_base(colors, footer, title)
         _draw_row(img, names, move_to, target, _font_for(0, s), s * row_h, colors,
                   selected=True, gold=True, label=answerer_label, label_size=label_a,
-                  label_color=label_color, label_alpha=1.0, label_dy=-1)
+                  label_color=label_color, label_alpha=1.0, label_dy=_ldy)
         layer = _draw_hwheel_layer(names, final_x_off, wheel_y0, colors, final=True,
                                    fade_others=(f + 1) / CFG.FADE_FRAMES)
         img.paste(layer, (0, 0), layer)
@@ -511,7 +536,7 @@ def _build_frames(names: list[str], target: int, asker_idx: int, colors: dict,
         img = _draw_base(colors, footer, title)
         _draw_row(img, names, move_to, target, _font_for(0, s), s * row_h, colors,
                   selected=True, gold=True, label=answerer_label, label_size=label_a,
-                  label_color=label_color, label_alpha=1.0, label_dy=-1)
+                  label_color=label_color, label_alpha=1.0, label_dy=_ldy)
         _draw_reveal(img, names, asker_idx, t, (f + 1) / CFG.MOVE_FRAMES * 2.0, 0.0,
                      wheel_y0, colors, row_h, move_to, asker_label)
         frames.append((img, 70))
@@ -519,7 +544,7 @@ def _build_frames(names: list[str], target: int, asker_idx: int, colors: dict,
         img = _draw_base(colors, footer, title)
         _draw_row(img, names, move_to, target, _font_for(0, s), s * row_h, colors,
                   selected=True, gold=True, label=answerer_label, label_size=label_a,
-                  label_color=label_color, label_alpha=1.0, label_dy=-1)
+                  label_color=label_color, label_alpha=1.0, label_dy=_ldy)
         _draw_reveal(img, names, asker_idx, 1.0, 2.0,
                      (f + 1) / CFG.LABEL_FADE_FRAMES,
                      wheel_y0, colors, row_h, move_to, asker_label)
@@ -527,7 +552,7 @@ def _build_frames(names: list[str], target: int, asker_idx: int, colors: dict,
     img = _draw_base(colors, footer, title)
     _draw_row(img, names, move_to, target, _font_for(0, s), s * row_h, colors,
               selected=True, gold=True, label=answerer_label, label_size=label_a,
-              label_color=label_color, label_alpha=1.0, label_dy=-1)
+              label_color=label_color, label_alpha=1.0, label_dy=_ldy)
     _draw_reveal(img, names, asker_idx, 1.0, 2.0, 1.0,
                  wheel_y0, colors, row_h, move_to, asker_label)
     frames.append((img, CFG.HOLD2_MS))
