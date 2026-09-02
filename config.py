@@ -98,7 +98,8 @@ WHEEL_NUM_FINAL = (255, 240, 240)  # 终点首字/全名提亮
 # ---------- 规则 ----------
 MIN_PLAYERS = 2
 MAX_PLAYERS = 20
-WEIGHT_COEF = 1.5           # 连中降权系数（可配置）：权重 = 1/(1+连中×系数)
+WEIGHT_COEF = 1.5           # 出场降权系数（可配置）：权重 = 1/(1+近窗口局出场次数×系数)
+WINDOW_DEFAULT = 8          # 降权窗口局数（可配置）：统计最近 N 局出场次数
 NAME_MAX_CHARS = 10         # 渲染截断上限
 CYCLE_ROUNDS = 3            # 滚动循环圈数
 ACCESS_MODE_DEFAULT = "宽松"  # 准入模式：宽松（黑名单，默认全开）/ 严格（白名单，仅登记群）
@@ -250,6 +251,16 @@ def max_players_of(plugin_cfg) -> int:
         return max(2, int(plugin_cfg.get("max_players", MAX_PLAYERS)))
     except (TypeError, ValueError):
         return MAX_PLAYERS
+
+
+def window_of(plugin_cfg) -> int:
+    """降权窗口局数（2~20 截断，非法值回退默认 8）。"""
+    if plugin_cfg is None:
+        return WINDOW_DEFAULT
+    try:
+        return max(2, min(20, int(plugin_cfg.get("weight_window", WINDOW_DEFAULT))))
+    except (TypeError, ValueError):
+        return WINDOW_DEFAULT
 
 
 RES_OPTIONS = (150, 300)   # 动画分辨率档位：标准 / 高清（点开不糊）

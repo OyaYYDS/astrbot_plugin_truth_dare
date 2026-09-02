@@ -69,7 +69,7 @@
     "hint": "从开始滚动到定格的总时长，单位毫秒"
   },
   "weight_coef": {
-    "description": "连中降权系数",
+    "description": "出场降权系数",
     "type": "float",
     "default": 1.5,
     "slider": {
@@ -77,7 +77,18 @@
       "max": 5.0,
       "step": 0.1
     },
-    "hint": "权重 = 1 / (1 + 连中次数 × 系数)，系数越大连中概率降得越快"
+    "hint": "权重 = 1 / (1 + 近窗口局出场次数 × 系数)，系数越大近期出场者被压得越狠"
+  },
+  "weight_window": {
+    "description": "降权窗口局数",
+    "type": "int",
+    "default": 8,
+    "slider": {
+      "min": 2,
+      "max": 20,
+      "step": 1
+    },
+    "hint": "统计最近 N 局内回答者/提问者各出场几次来降权；窗口越大越平滑、越小压制越猛。久未出场者计数归零自动回升"
   },
   "text_mode": {
     "description": "文本模式",

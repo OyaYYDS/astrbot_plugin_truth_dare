@@ -6,7 +6,6 @@
 
 import asyncio
 import os
-import random
 import re
 import tempfile
 import time
@@ -28,7 +27,7 @@ PLUGIN_NAME = "astrbot_plugin_truth_dare"
     PLUGIN_NAME,
     "Oya & Claude",
     "QQ 群选人器：报名、竖向滚轮动画选人、真艾特播报，支持连中降权与多群独立名单。",
-    "0.2.2",
+    "0.2.3",
 )
 class TruthDarePlugin(Star):
     def __init__(self, context: Context, config=None):
@@ -198,8 +197,10 @@ class TruthDarePlugin(Star):
             return CFG.get_reply("start_spinning"), False
         store.mark_spinning(gid, True)
         try:
-            # ① 先随机确定选中者（连中降权加权随机）
-            winner_qq = store.weighted_pick(data["players"], self._coef())
+            # ① 抽回答者：近窗口局出场计数加权（v0.2.3 滑动窗口降权）
+            window = CFG.window_of(self.config)
+            wcnt, qcnt = store.recent_pick_counts(data, window)
+            winner_qq = store.weighted_pick_by_counts(data["players"], wcnt, self._coef())
             winner_name = data["players"][winner_qq]["name"]
             names = [info["name"] for _, info in players]
             target = [i for i, (qq, _) in enumerate(players) if qq == winner_qq][0]
@@ -209,11 +210,12 @@ class TruthDarePlugin(Star):
             mode = data.get("pick_mode") or self._pick_mode()
             single_act = mode == "单人"
             text_only = data.get("text_mode", CFG.text_mode_of(self.config))
-            # ② 双人/文本模式：抽提问者（排除回答者，其余等概率；横盘停在首字格=索引）
+            # ② 双人/文本模式：抽提问者（排除回答者，同样按窗口计数加权；横盘停在首字格=索引）
             asker_qq = asker_idx = None
             if not single_act:
-                others = [i for i, (qq, _) in enumerate(players) if qq != winner_qq]
-                asker_idx = others[random.randrange(len(others))]
+                others_players = {qq: info for qq, info in players if qq != winner_qq}
+                asker_qq = store.weighted_pick_by_counts(others_players, qcnt, self._coef())
+                asker_idx = [i for i, (qq, _) in enumerate(players) if qq == asker_qq][0]
                 asker_qq, asker_info = players[asker_idx]
             # ③ 渲染动画（文本模式跳过，纯文本极速播报；失败则不改任何状态）
             gif_bytes = None

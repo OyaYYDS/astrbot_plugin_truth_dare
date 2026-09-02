@@ -77,10 +77,35 @@ def find_player(data: dict, target: str) -> list[str]:
 
 # ---------- 连中降权 ----------
 
-def weighted_pick(players: dict, coef: float) -> str:
-    """加权随机：权重 = 1/(1+连中次数×系数)，恒 >0。"""
+def recent_pick_counts(data: dict, window: int) -> tuple[dict[str, int], dict[str, int]]:
+    """统计最近 window 局内每人当回答者/提问者的次数。
+
+    从 history 尾部取窗口局（单人局快照无 asker 键，自然跳过）。
+    返回 (回答者计数, 提问者计数)，按 QQ 号索引。
+    """
+    wcnt: dict[str, int] = {}
+    qcnt: dict[str, int] = {}
+    for h in data.get("history", [])[-max(1, int(window)):]:
+        wq = str(h.get("winner", {}).get("qq", ""))
+        aq = str(h.get("asker", {}).get("qq", ""))
+        if wq:
+            wcnt[wq] = wcnt.get(wq, 0) + 1
+        if aq and aq != wq:
+            qcnt[aq] = qcnt.get(aq, 0) + 1
+    return wcnt, qcnt
+
+
+def weighted_pick_by_counts(players: dict, counts: dict[str, int], coef: float) -> str:
+    """按出场计数加权随机：权重 = 1/(1+计数×系数)，恒 >0。
+
+    counts 为该角色（回答者/提问者）近窗口局内的出场次数；
+    新人与久未出场者计数为 0，权重为全场最高的 1。
+    """
     items = list(players.items())
-    weights = [1.0 / (1.0 + max(0, int(info.get("streak", 0))) * coef) for _, info in items]
+    weights = [
+        1.0 / (1.0 + max(0, int(counts.get(qq, 0))) * coef)
+        for qq, _ in items
+    ]
     total = sum(weights)
     r = random.uniform(0, total)
     acc = 0.0
@@ -92,13 +117,14 @@ def weighted_pick(players: dict, coef: float) -> str:
 
 
 def apply_result(data: dict, winner_qq: str, coef: float) -> None:
-    """选中者连中+1、未选中者 max(0, 连中-1)；总游玩次数+1。"""
+    """被选中者（回答者）游玩次数+1；总游玩次数+1。
+
+    降权不再用 streak 字段记账（v0.2.3 起改按 history 窗口计数），
+    老数据的 streak 字段保留但不再读写。
+    """
     for qq, info in data.get("players", {}).items():
         if qq == winner_qq:
-            info["streak"] = int(info.get("streak", 0)) + 1
             info["play_count"] = int(info.get("play_count", 0)) + 1
-        else:
-            info["streak"] = max(0, int(info.get("streak", 0)) - 1)
     data["total_plays"] = int(data.get("total_plays", 0)) + 1
 
 
