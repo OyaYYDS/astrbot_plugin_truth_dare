@@ -28,7 +28,7 @@ PLUGIN_NAME = "astrbot_plugin_truth_dare"
     PLUGIN_NAME,
     "Oya & Claude",
     "QQ 群选人器：报名、竖向滚轮动画选人、真艾特播报，支持连中降权与多群独立名单。",
-    "0.2.0",
+    "0.2.2",
 )
 class TruthDarePlugin(Star):
     def __init__(self, context: Context, config=None):
@@ -109,31 +109,25 @@ class TruthDarePlugin(Star):
 
     # ---------- 报名 ----------
 
-    @filter.command("luckyadd", alias={"参加选人器"})
-    async def luckyadd(self, event: AstrMessageEvent, name: GreedyStr):
-        """报名参加选人器，可自定义显示名"""
+    async def _join_core(self, event: AstrMessageEvent, name: str) -> str:
+        """报名核心逻辑（指令与 LLM 工具共用），返回回复文本（静默拦截时为空串）。"""
         gid = self._gid(event)
         data = store.load_group(gid)
         ok, reply = self._gate(gid, data)
         if not ok:
-            if reply:
-                yield event.plain_result(reply)
-            return
+            return reply or ""
         qq = str(event.get_sender_id())
         custom = (name or "").strip()
         if qq in data["players"]:
             if custom:
                 data["players"][qq]["name"] = custom
                 store.save_group(gid, data)
-                yield event.plain_result(CFG.get_reply(
-                    "join_dup", name=custom, count=len(data["players"]), names=self._names_text(data)))
-            else:
-                yield event.plain_result(CFG.get_reply("join_already"))
-            return
+                return CFG.get_reply(
+                    "join_dup", name=custom, count=len(data["players"]), names=self._names_text(data))
+            return CFG.get_reply("join_already")
         max_players = CFG.max_players_of(self.config)
         if len(data["players"]) >= max_players:
-            yield event.plain_result(CFG.get_reply("join_full", max=max_players))
-            return
+            return CFG.get_reply("join_full", max=max_players)
         display = custom or self._sender_display(event)
         data["players"][qq] = {"name": display, "streak": 0, "play_count": 0}
         # 自动登记（玩过即登记）+ 顺手记录群名
@@ -148,21 +142,39 @@ class TruthDarePlugin(Star):
             pass
         store.save_group(gid, data)
         store.clear_warn(gid, "quit")
-        yield event.plain_result(CFG.get_reply(
-            "join_ok", name=display, count=len(data["players"]), names=self._names_text(data)))
+        return CFG.get_reply(
+            "join_ok", name=display, count=len(data["players"]), names=self._names_text(data))
+
+    @filter.command("luckyadd", alias={"参加选人器"})
+    async def luckyadd(self, event: AstrMessageEvent, name: GreedyStr):
+        """报名参加选人器，可自定义显示名"""
+        text = await self._join_core(event, name or "")
+        if text:
+            yield event.plain_result(text)
+
+    @filter.llm_tool()
+    async def td_join(self, event: AstrMessageEvent, name: str):
+        """
+        帮用户报名选人器。当用户说想参加/报名/加入选人器时调用。
+        Args:
+            name(string): 用户想用的显示名，没提到就传空字符串
+        """
+        text = await self._join_core(event, name or "")
+        return text or "本群选人器未开放，无法报名。"
 
     # ---------- 开转 ----------
 
-    @filter.command("luckyplay", alias={"选人器开始"})
-    async def luckyplay(self, event: AstrMessageEvent):
-        """开始抽选（按当前模式播报滚轮动画或纯文本）"""
+    async def _play_core(self, event: AstrMessageEvent) -> tuple[str, bool]:
+        """开转核心逻辑（指令与 LLM 工具共用）。
+
+        返回 (文本, 已发送)：失败/拦截路径返回 (提示文本, False)；
+        成功路径内部完成名单/GIF/艾特发送后返回 (结果摘要, True)。
+        """
         gid = self._gid(event)
         data = store.load_group(gid)
         ok, reply = self._gate(gid, data)
         if not ok:
-            if reply:
-                yield event.plain_result(reply)
-            return
+            return (reply or ""), False
         # 每次开转都刷新群名（首次报名抓取作为兜底，这里保持跟随群改名）
         try:
             grp = await event.get_group()
@@ -173,11 +185,9 @@ class TruthDarePlugin(Star):
             pass
         players = store.players_list(data)
         if len(players) < CFG.MIN_PLAYERS:
-            yield event.plain_result(CFG.get_reply("start_need_more", count=len(players)))
-            return
+            return CFG.get_reply("start_need_more", count=len(players)), False
         if store.is_spinning(gid):
-            yield event.plain_result(CFG.get_reply("start_spinning"))
-            return
+            return CFG.get_reply("start_spinning"), False
         store.mark_spinning(gid, True)
         try:
             # ① 先随机确定选中者（连中降权加权随机）
@@ -206,8 +216,7 @@ class TruthDarePlugin(Star):
                         labels, single_act)
                 except Exception as e:
                     logger.error(f"[truth_dare] GIF 渲染失败: {e}")
-                    yield event.plain_result("转盘生成失败，请稍后再试")
-                    return
+                    return "转盘生成失败，请稍后再试", False
             # ④ 提交本局状态与历史快照（设计文档 10.8：播报准备完成后才提交）
             store.apply_result(data, winner_qq, self._coef())
             snapshot = {
@@ -239,6 +248,7 @@ class TruthDarePlugin(Star):
                 ]))
                 if mention:
                     await event.send(MessageChain([At(qq=winner_qq)]))
+                summary = CFG.get_reply("winner_text", answerer=answerer_label, winner=winner_name)
             elif text_only:
                 await event.send(MessageChain([
                     Plain(CFG.get_reply("play_roster", roster=roster) + "\n"
@@ -248,6 +258,9 @@ class TruthDarePlugin(Star):
                 ]))
                 if mention:
                     await event.send(MessageChain([At(qq=winner_qq), At(qq=asker_qq)]))
+                summary = CFG.get_reply("play_result", answerer=answerer_label,
+                                        winner=winner_name, asker=asker_label,
+                                        asker_name=asker_info["name"])
             elif single_act:
                 await event.send(MessageChain([
                     Plain(CFG.get_reply("play_roster", roster=roster)),
@@ -257,6 +270,7 @@ class TruthDarePlugin(Star):
                 ]))
                 if mention:
                     await event.send(MessageChain([At(qq=winner_qq)]))
+                summary = CFG.get_reply("winner_text", answerer=answerer_label, winner=winner_name)
             else:
                 await event.send(MessageChain([
                     Plain(CFG.get_reply("play_roster", roster=roster)),
@@ -266,8 +280,25 @@ class TruthDarePlugin(Star):
                 ]))
                 if mention:
                     await event.send(MessageChain([At(qq=winner_qq), At(qq=asker_qq)]))
+                summary = CFG.get_reply("play_result", answerer=answerer_label,
+                                        winner=winner_name, asker=asker_label,
+                                        asker_name=asker_info["name"])
+            return summary, True
         finally:
             store.mark_spinning(gid, False)
+
+    @filter.command("luckyplay", alias={"选人器开始"})
+    async def luckyplay(self, event: AstrMessageEvent):
+        """开始抽选（按当前模式播报滚轮动画或纯文本）"""
+        text, sent = await self._play_core(event)
+        if text and not sent:
+            yield event.plain_result(text)
+
+    @filter.llm_tool()
+    async def td_start(self, event: AstrMessageEvent):
+        """开始一轮选人器抽选。当用户说开始/开转/抽一个/玩一局时调用。名单与动画会直接发到群里。"""
+        text, _ = await self._play_core(event)
+        return text or "本群选人器未开放，无法开始。"
 
     # ---------- 帮助 ----------
 
@@ -328,15 +359,13 @@ class TruthDarePlugin(Star):
 
     # ---------- 战绩查询 ----------
 
-    @filter.command("luckyrank", alias={"选人器排行榜"})
-    async def luckyrank(self, event: AstrMessageEvent):
-        """本群战绩统计（前 5 排行）"""
+    async def _rank_core(self, event: AstrMessageEvent) -> str:
+        """本群战绩统计核心（前 5 排行），返回回复文本。"""
         gid = self._gid(event)
         data = store.load_group(gid)
         hist = data.get("history", [])
         if not hist:
-            yield event.plain_result(CFG.get_reply("rank_empty"))
-            return
+            return CFG.get_reply("rank_empty")
         counts: dict[str, dict] = {}
         for h in hist:
             wq = str(h.get("winner", {}).get("qq", ""))
@@ -349,9 +378,19 @@ class TruthDarePlugin(Star):
         medals = ["🥇", "🥈", "🥉", "4.", "5."]
         lines = "\n".join(f"{medals[i]} {v['name']} {v['n']} 次" for i, (_, v) in enumerate(top))
         name = data.get("alias") or data.get("group_name") or gid
-        yield event.plain_result(CFG.get_reply(
+        return CFG.get_reply(
             "rank_group", name=name, plays=len(hist),
-            count=len(data.get("players", {})), lines=lines))
+            count=len(data.get("players", {})), lines=lines)
+
+    @filter.command("luckyrank", alias={"选人器排行榜"})
+    async def luckyrank(self, event: AstrMessageEvent):
+        """本群战绩统计（前 5 排行）"""
+        yield event.plain_result(self._rank_core(event))
+
+    @filter.llm_tool()
+    async def td_rank(self, event: AstrMessageEvent):
+        """查看本群选人器战绩排行。当用户问谁赢得多/战绩/排行时调用。"""
+        return self._rank_core(event)
 
     @filter.command("luckygrank", alias={"选人器群排行榜"})
     async def luckygrank(self, event: AstrMessageEvent):
@@ -386,57 +425,84 @@ class TruthDarePlugin(Star):
     @filter.command("luckystatus", alias={"选人器状态"})
     async def luckystatus(self, event: AstrMessageEvent):
         """本群状态自查（开启/登记/模式/动画/人数）"""
+        yield event.plain_result(self._status_core(event))
+
+    @filter.llm_tool()
+    async def td_status(self, event: AstrMessageEvent):
+        """查看本群选人器状态。当用户问玩法开着没/怎么玩/当前设置时调用。"""
+        return self._status_core(event)
+
+    def _status_core(self, event: AstrMessageEvent) -> str:
+        """本群状态核心，返回状态文本。"""
         gid = self._gid(event)
         data = store.load_group(gid)
         mode = data.get("pick_mode") or self._pick_mode()
         label = "两人" if mode == "双人" else "一人"
         anim = "关" if data.get("text_mode", CFG.text_mode_of(self.config)) else "开"
-        yield event.plain_result(CFG.get_reply(
+        return CFG.get_reply(
             "status",
             on="是" if data.get("enabled", True) else "否",
             reg="是" if data.get("registered", False) else "否",
-            label=label, anim=anim, count=len(data.get("players", {}))))
+            label=label, anim=anim, count=len(data.get("players", {})))
 
     # ---------- 名单查询 ----------
+
+    async def _list_core(self, event: AstrMessageEvent) -> str:
+        """名单查询核心，返回回复文本（静默拦截时为空串）。"""
+        gid = self._gid(event)
+        data = store.load_group(gid)
+        ok, reply = self._gate(gid, data)
+        if not ok:
+            return reply or ""
+        players = store.players_list(data)
+        if not players:
+            return CFG.get_reply("list_empty", title=CFG.get_labels(self.config)[0])
+        return CFG.get_reply("list_players", count=len(players), names=self._names_text(data))
 
     @filter.command("luckylist", alias={"选人器玩家"})
     async def luckylist(self, event: AstrMessageEvent):
         """查看当前名单"""
+        text = self._list_core(event)
+        if text:
+            yield event.plain_result(text)
+
+    @filter.llm_tool()
+    async def td_roster(self, event: AstrMessageEvent):
+        """查看本群选人器报名名单。当用户问现在有谁/名单/参加的人/几个人时调用。"""
+        text = self._list_core(event)
+        return text or "本群选人器未开放，无法查看名单。"
+
+    # ---------- 退出 ----------
+
+    async def _quit_core(self, event: AstrMessageEvent) -> str:
+        """退出游戏核心，返回回复文本（静默拦截时为空串）。"""
         gid = self._gid(event)
         data = store.load_group(gid)
         ok, reply = self._gate(gid, data)
         if not ok:
-            if reply:
-                yield event.plain_result(reply)
-            return
-        players = store.players_list(data)
-        if not players:
-            yield event.plain_result(CFG.get_reply(
-                "list_empty", title=CFG.get_labels(self.config)[0]))
-            return
-        yield event.plain_result(CFG.get_reply("list_players", count=len(players), names=self._names_text(data)))
-
-    # ---------- 退出 ----------
+            return reply or ""
+        qq = str(event.get_sender_id())
+        if qq not in data["players"]:
+            if store.should_warn(gid, "quit"):
+                return CFG.get_reply("quit_not_in")
+            return ""
+        name = data["players"][qq]["name"]
+        del data["players"][qq]
+        store.save_group(gid, data)
+        return CFG.get_reply("quit_ok", name=name, count=len(data["players"]), names=self._names_text(data))
 
     @filter.command("luckyquit", alias={"选人器退出"})
     async def luckyquit(self, event: AstrMessageEvent):
         """退出游戏"""
-        gid = self._gid(event)
-        data = store.load_group(gid)
-        ok, reply = self._gate(gid, data)
-        if not ok:
-            if reply:
-                yield event.plain_result(reply)
-            return
-        qq = str(event.get_sender_id())
-        if qq not in data["players"]:
-            if store.should_warn(gid, "quit"):
-                yield event.plain_result(CFG.get_reply("quit_not_in"))
-            return
-        name = data["players"][qq]["name"]
-        del data["players"][qq]
-        store.save_group(gid, data)
-        yield event.plain_result(CFG.get_reply("quit_ok", name=name, count=len(data["players"]), names=self._names_text(data)))
+        text = await self._quit_core(event)
+        if text:
+            yield event.plain_result(text)
+
+    @filter.llm_tool()
+    async def td_quit(self, event: AstrMessageEvent):
+        """帮用户退出选人器。当用户说退出/不玩了/把我移出名单时调用。"""
+        text = await self._quit_core(event)
+        return text or "本群选人器未开放，无法退出。"
 
     # ---------- 重置 ----------
 
@@ -454,12 +520,11 @@ class TruthDarePlugin(Star):
         store.save_group(gid, data)
         yield event.plain_result(CFG.get_reply("reset_ok"))
 
-    # ---------- 管理员：移除玩家 ----------
+    # ---------- 移除玩家（全员可用） ----------
 
-    @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("luckyremove", alias={"选人器玩家移除"})
     async def luckyremove(self, event: AstrMessageEvent, target: GreedyStr):
-        """管理员：按名字或 QQ 号移除玩家"""
+        """按名字或 QQ 号把某人移出名单（全员可用）"""
         gid = self._gid(event)
         data = store.load_group(gid)
         ok, reply = self._gate(gid, data)
