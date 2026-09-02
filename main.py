@@ -84,6 +84,12 @@ class TruthDarePlugin(Star):
         """抽取人数：双人（两幕）/ 单人（仅滚轮）。"""
         return CFG.pick_mode_of(self.config)
 
+    def _llm_on(self) -> bool:
+        """LLM 自然语言支持开关（配置 llm_support，默认开）。"""
+        if self.config is None:
+            return True
+        return bool(self.config.get("llm_support", True))
+
     @staticmethod
     def _extract_qq_from_at(text: str) -> str:
         """从 [CQ:at,qq=xxx] 或 [At:xxx] 形式的文本中提取 QQ 号。"""
@@ -159,6 +165,8 @@ class TruthDarePlugin(Star):
         Args:
             name(string): 用户想用的显示名，没提到就传空字符串
         """
+        if not self._llm_on():
+            return "本插件未开启 LLM 自然语言支持，请使用指令（@我 选人器帮助）。"
         text = await self._join_core(event, name or "")
         return text or "本群选人器未开放，无法报名。"
 
@@ -297,6 +305,8 @@ class TruthDarePlugin(Star):
     @filter.llm_tool()
     async def td_start(self, event: AstrMessageEvent):
         """开始一轮选人器抽选。当用户说开始/开转/抽一个/玩一局时调用。名单与动画会直接发到群里。"""
+        if not self._llm_on():
+            return "本插件未开启 LLM 自然语言支持，请使用指令（@我 选人器帮助）。"
         text, _ = await self._play_core(event)
         return text or "本群选人器未开放，无法开始。"
 
@@ -304,14 +314,20 @@ class TruthDarePlugin(Star):
 
     @filter.command("luckyhelp", alias={"选人器帮助"})
     async def luckyhelp(self, event: AstrMessageEvent):
-        """玩法与常用指令说明"""
-        yield event.plain_result(CFG.get_reply("help_member"))
+        """玩法与常用指令说明（文案可在插件配置自定义）"""
+        text = ""
+        if self.config is not None:
+            text = str(self.config.get("help_text_member", "") or "").strip()
+        yield event.plain_result(text or CFG.get_reply("help_member"))
 
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("luckycmds", alias={"选人器指令"})
     async def luckycmds(self, event: AstrMessageEvent):
-        """管理员：全部管理指令清单"""
-        yield event.plain_result(CFG.get_reply("help_admin"))
+        """管理员：全部管理指令清单（文案可在插件配置自定义）"""
+        text = ""
+        if self.config is not None:
+            text = str(self.config.get("help_text_admin", "") or "").strip()
+        yield event.plain_result(text or CFG.get_reply("help_admin"))
 
     # ---------- 模式/动画切换（按群存储覆盖，所有人可用） ----------
 
@@ -390,6 +406,8 @@ class TruthDarePlugin(Star):
     @filter.llm_tool()
     async def td_rank(self, event: AstrMessageEvent):
         """查看本群选人器战绩排行。当用户问谁赢得多/战绩/排行时调用。"""
+        if not self._llm_on():
+            return "本插件未开启 LLM 自然语言支持，请使用指令（@我 选人器帮助）。"
         return self._rank_core(event)
 
     @filter.command("luckygrank", alias={"选人器群排行榜"})
@@ -430,6 +448,8 @@ class TruthDarePlugin(Star):
     @filter.llm_tool()
     async def td_status(self, event: AstrMessageEvent):
         """查看本群选人器状态。当用户问玩法开着没/怎么玩/当前设置时调用。"""
+        if not self._llm_on():
+            return "本插件未开启 LLM 自然语言支持，请使用指令（@我 选人器帮助）。"
         return self._status_core(event)
 
     def _status_core(self, event: AstrMessageEvent) -> str:
@@ -469,6 +489,8 @@ class TruthDarePlugin(Star):
     @filter.llm_tool()
     async def td_roster(self, event: AstrMessageEvent):
         """查看本群选人器报名名单。当用户问现在有谁/名单/参加的人/几个人时调用。"""
+        if not self._llm_on():
+            return "本插件未开启 LLM 自然语言支持，请使用指令（@我 选人器帮助）。"
         text = self._list_core(event)
         return text or "本群选人器未开放，无法查看名单。"
 
@@ -501,6 +523,8 @@ class TruthDarePlugin(Star):
     @filter.llm_tool()
     async def td_quit(self, event: AstrMessageEvent):
         """帮用户退出选人器。当用户说退出/不玩了/把我移出名单时调用。"""
+        if not self._llm_on():
+            return "本插件未开启 LLM 自然语言支持，请使用指令（@我 选人器帮助）。"
         text = await self._quit_core(event)
         return text or "本群选人器未开放，无法退出。"
 

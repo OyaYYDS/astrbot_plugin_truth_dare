@@ -5,6 +5,12 @@
     "default": false,
     "hint": "开：仅登记过的群可玩（严格）；关：所有群默认可玩，可用关闭指令封锁指定群（宽松）。旧配置的 access_mode 字段自动兼容"
   },
+  "llm_support": {
+    "description": "LLM 自然语言支持",
+    "type": "bool",
+    "default": true,
+    "hint": "开=支持用大白话操作（查名单/报名/开转/退出/查战绩/查状态）；关=仅指令操作"
+  },
   "theme": {
     "description": "整体主题",
     "type": "string",
@@ -104,5 +110,17 @@
     ],
     "default": "150",
     "hint": "150 体积小渲染快；300 点开原图更清晰，体积约 3 倍"
+  },
+  "help_text_member": {
+    "description": "「选人器帮助」文案（可自定义）",
+    "type": "text",
+    "default": "",
+    "hint": "留空 = 使用默认文案；支持多行文本"
+  },
+  "help_text_admin": {
+    "description": "「选人器指令」文案（可自定义）",
+    "type": "text",
+    "default": "",
+    "hint": "留空 = 使用默认文案；支持多行文本"
   }
 }
