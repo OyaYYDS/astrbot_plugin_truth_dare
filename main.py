@@ -359,7 +359,7 @@ class TruthDarePlugin(Star):
 
     # ---------- 战绩查询 ----------
 
-    async def _rank_core(self, event: AstrMessageEvent) -> str:
+    def _rank_core(self, event: AstrMessageEvent) -> str:
         """本群战绩统计核心（前 5 排行），返回回复文本。"""
         gid = self._gid(event)
         data = store.load_group(gid)
@@ -447,7 +447,7 @@ class TruthDarePlugin(Star):
 
     # ---------- 名单查询 ----------
 
-    async def _list_core(self, event: AstrMessageEvent) -> str:
+    def _list_core(self, event: AstrMessageEvent) -> str:
         """名单查询核心，返回回复文本（静默拦截时为空串）。"""
         gid = self._gid(event)
         data = store.load_group(gid)
